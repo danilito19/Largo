@@ -22,7 +22,7 @@ add_filter( 'the_content', 'largo_attachment_image_link_remove_filter' );
 /**
  * Load the picturefill.wp plugin
  */
-//require_once(get_template_directory() . '/inc/picturefill/picturefill-wp.php');
+require_once(get_template_directory() . '/inc/picturefill/picturefill-wp.php');
 
 if ( ! function_exists( 'largo_home_icon' ) ) {
 	function largo_home_icon( $class='', $size = 'home-logo' ) {
