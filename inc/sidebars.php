@@ -260,3 +260,69 @@ function largo_is_sidebar_required() {
 
 	return ( $two_column_layout_test || $two_column_layout_test_forced || $one_column_layout_test );
 }
+
+/**
+ * Render the widget setting fields on the widget page
+ */
+function largo_widget_settings() {
+	?>
+ 		<div class="advance-widget-settings">
+ 			<div class="advance-widget-settings-title"><?php _e( 'Largo Sidebar Options', 'largo' ); ?></div>
+			<div id="optionsframework-metabox" class="metabox-holder">
+			    <div id="optionsframework" class="postbox">
+					<form action="options.php" method="post">
+						<div> <?php // Extra open <div> because optinosframework_fields() adds an extra closing </div> ?>
+					<?php
+					// Prints hidden tags for WP's options.php to save the value
+					settings_fields('optionsframework');
+
+					// Print all the currently saved values for those fields that aren't outputted
+					$options_to_show = optionsframework_options();
+					$config = get_option( 'optionsframework', array() );
+					// Gets the unique option id
+					if ( isset( $config['id'] ) ) {
+						$option_name = $config['id'];
+					}
+					else {
+						$option_name = 'optionsframework';
+					};
+
+					$current_values = get_option( $option_name, array() );
+
+					foreach ( $options_to_show as $key => $field ) {
+						if ( isset($field['id']) && isset($current_values[$field['id']]) ) {
+							unset( $current_values[$field['id']] );
+						}
+					}
+
+					foreach ( $current_values as $key => $val ) {
+						echo '<input type="hidden" name="', esc_attr( $option_name . '[' . $key . ']'), '" value="', esc_attr( $val ) ,'" />';
+					}
+
+					// Prints the fields
+					optionsframework_fields(); /* Settings */ ?>
+					<div id="optionsframework-submit">
+						<input type="submit" class="button-primary" name="update" value="<?php esc_attr_e( 'Save Options', 'largo' ); ?>" />
+						<input type="submit" class="reset-button button-secondary" name="reset" value="<?php esc_attr_e( 'Restore Defaults', 'largo' ); ?>" onclick="return confirm( '<?php print esc_js( __( 'Click OK to reset. Any theme settings will be lost!', 'largo' ) ); ?>' );" />
+						<br class="clear" />
+					</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	<?php
+}
+add_action( 'widgets_admin_page', 'largo_widget_settings' );
+
+/**
+ * Load up the scripts for options framework on the widgets
+ */
+function largo_load_of_script_for_widget( $hook ) {
+
+	if ( $hook == 'widgets.php' ) {
+		optionsframework_load_scripts( 'appearance_page_options-framework' );
+		optionsframework_load_styles();
+		wp_enqueue_style( 'largo-widgets-php', get_template_directory_uri() . '/css/widgets-php.css');
+	}
+}
+add_action('admin_enqueue_scripts', 'largo_load_of_script_for_widget');
