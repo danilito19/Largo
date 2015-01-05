@@ -26,6 +26,7 @@ VERSION: 0.3
 
 * Download and Install WordPress
 * Download the latest version of the Largo parent theme
+	- This project uses git submodules. Use `git clone --recursive` to make sure that the submodules are cloned, or run `git submodule init` and `git submodule update` after cloning.
 * Create a child theme and activate from the WordPress appearance menu. If you are not familiar with how child themes work, see: http://codex.wordpress.org/Child_Themes
 * Install required/recommended plugins
 * Configure your theme options in the Appearance > Theme Options menu
