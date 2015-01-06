@@ -1,4 +1,5 @@
 <?php
+defined('ABSPATH') OR exit;
 if(!class_exists('Picturefill_WP')){
   class Picturefill_WP{
 
@@ -21,13 +22,63 @@ if(!class_exists('Picturefill_WP')){
       return null;
     }
 
+    public static function deactivate(){
+      self::clear_picturefill_wp_options();
+    }
+
+    public static function clear_picturefill_wp_options(){
+      global $wpdb;
+      $picturefill_wp_transients = $wpdb->get_col('SELECT option_name FROM ' . $wpdb->options . ' WHERE option_name LIKE \'%picturefill_wp%\'');
+      foreach($picturefill_wp_transients as $transient){
+        delete_option($transient);
+      }
+    }
+
+    public static function clear_picturefill_wp_transients(){
+      global $wpdb;
+      $picturefill_wp_transients = $wpdb->get_col('SELECT option_name FROM ' . $wpdb->options . ' WHERE option_name LIKE \'%_picturefill_wp%\'');
+      foreach($picturefill_wp_transients as $transient){
+        delete_option($transient);
+      }
+    }
+
     // Constructor, add actions and filters
     private function __construct(){
-      add_action('init', array($this, 'add_image_sizes'), 11);	//after Largo's sizes
-      add_filter('the_content', array($this, 'replace_images'), 11);
+      add_action('init', array($this, 'add_image_sizes'));
+      add_action('init', array($this, 'add_update_hook'));
+      add_action('wp_enqueue_scripts', array($this, 'register_picturefill_scripts'));
+      add_filter('the_content', array($this, 'apply_picturefill_wp_to_the_content'), apply_filters('picturefill_wp_the_content_filter_priority', 11));
+      add_action('picturefill_wp_updated', array('Picturefill_WP', 'clear_picturefill_wp_transients'));
+    }
+
+    // Filter and action methods
+    public function register_picturefill_scripts(){
+      wp_register_script('picturefill', PICTUREFILL_WP_URL . 'js/libs/picturefill.min.js', array(), PICTUREFILL_WP_VERSION, true);
+    }
+
+    public function apply_picturefill_wp_to_the_content($html){
+      return $this->cache_picturefill_output($html, 'the_content');
+    }
+
+    public function cache_picturefill_output($html, $content_type = 'depreciated'){
+      global $wp_scripts;
+      $html_hash = md5($html);
+      $cache_duration = apply_filters('picturefill_wp_cache_duration', 86400);
+      $cached_output = get_transient('picturefill_wp_output_' . $html_hash);
+      if(!empty($cached_output)){
+        wp_enqueue_script('picturefill');
+        return $cached_output;
+      }else{
+        $output = $this->replace_images($html);
+        if($output !== $html){
+          set_transient('picturefill_wp_output_' . $html_hash, $output, $cache_duration);
+        }
+        return $output;
+      }
     }
 
     public function replace_images($html){
+      do_action('picturefill_wp_before_replace_images');
       require_once(PICTUREFILL_WP_PATH . 'inc/class-model-picturefill-wp.php');
       $DOMDocument = Model_Picturefill_WP::get_DOMDocument();
       $images = Model_Picturefill_WP::get_images($DOMDocument, $html);
@@ -36,19 +87,32 @@ if(!class_exists('Picturefill_WP')){
         wp_enqueue_script('picturefill');
         $html = View_Picturefill_WP::standardize_img_tags($html);
         foreach($images as $image){
-          $model_picturefill_wp = new Model_Picturefill_WP($DOMDocument, $image);
-          $view_picturefill_wp = new View_Picturefill_WP($model_picturefill_wp);
+          if('noscript' !== $image->parentNode->tagName && !$image->hasAttribute('data-picturefill-wp-ignore')){
+            $model_picturefill_wp = new Model_Picturefill_WP($DOMDocument, $image);
+            $view_picturefill_wp = new View_Picturefill_WP($model_picturefill_wp);
 
-          $html = str_replace($view_picturefill_wp->get_original_image(), $view_picturefill_wp->render_template('picture'), $html);
+            $html = str_replace($view_picturefill_wp->get_original_image(), $view_picturefill_wp->render_template('picture'), $html);
+          }
         }
+      }elseif(true === Model_Picturefill_WP::syntax_present($DOMDocument, $html)){
+        wp_enqueue_script('picturefill');
       }
-      return $html;
+      do_action('picturefill_wp_after_replace_images');
+      return apply_filters('picturefill_wp_replace_images_output', $html);
     }
 
     public function add_image_sizes(){
       add_image_size('thumbnail@2x', get_option('thumbnail_size_w') * 2, get_option('thumbnail_size_h') * 2, get_option('thumbnail_crop'));
       add_image_size('medium@2x', get_option('medium_size_w') * 2, get_option('medium_size_h') * 2, get_option('medium_crop'));
       add_image_size('large@2x', get_option('large_size_w') * 2, get_option('large_size_h') * 2, get_option('large_crop'));
+    }
+
+    public function add_update_hook(){
+      if(get_option('picturefill_wp_version') !== PICTUREFILL_WP_VERSION){
+        do_action('picturefill_wp_updated');
+        update_option('picturefill_wp_update_timestamp', time());
+        update_option('picturefill_wp_version', PICTUREFILL_WP_VERSION);
+      }
     }
   }
 }
